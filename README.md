@@ -29,23 +29,38 @@ ChatGPT → https://mcp.pulser-ai.app (Squarespace DNS)
 - [Squarespace DNS access](https://account.squarespace.com/domains)
 - ChatGPT Pro/Business/Enterprise (for custom MCP connectors)
 
+## 🚀 Quick Deploy
+
+### One-Click Deploy to Render
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/jgtolentino/render-mcp-bridge)
+
+Click the button above to deploy directly to Render. The deployment will:
+- Create a new Web Service automatically
+- Install dependencies and start the server
+- Provide a public HTTPS URL
+
+**For detailed deployment options and troubleshooting, see [RENDER_DEPLOY.md](./RENDER_DEPLOY.md)**
+
+---
+
 ## Deployment Guide
 
-### Option A: Render Blueprint (Recommended)
+### Option A: One-Click Deploy (Fastest)
 
-1. **Push to GitHub**
-   ```bash
-   git init
-   git add .
-   git commit -m "Initial MCP server setup"
-   git remote add origin https://github.com/yourusername/render-mcp-bridge.git
-   git push -u origin main
+Use the button above for instant deployment.
+
+### Option B: Render Blueprint (Manual)
+
+1. **Repository is already on GitHub:**
+   ```
+   https://github.com/jgtolentino/render-mcp-bridge
    ```
 
 2. **Deploy via Render Blueprint**
    - Go to [Render Dashboard](https://dashboard.render.com/)
    - Click **New → Blueprint**
-   - Connect your GitHub repository
+   - Connect repository: `jgtolentino/render-mcp-bridge`
    - Render auto-detects `render.yaml` and provisions the service
    - Wait for deployment (check `/healthz` endpoint)
 
