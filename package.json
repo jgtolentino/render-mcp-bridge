@@ -25,10 +25,10 @@
   "author": "TBWA",
   "license": "MIT",
   "dependencies": {
+    "@modelcontextprotocol/sdk": "1.18.2",
     "cors": "^2.8.5",
     "express": "^4.19.2"
   },
-  "devDependencies": {},
   "repository": {
     "type": "git",
     "url": "git+https://github.com/jgtolentino/render-mcp-bridge.git"
