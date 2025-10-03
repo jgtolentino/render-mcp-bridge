@@ -1,6 +1,7 @@
 const express = require('express');
 const { Server } = require('@modelcontextprotocol/sdk/server/index.js');
 const { StreamableHTTPServerTransport } = require('@modelcontextprotocol/sdk/server/streamableHttp.js');
+const { ListToolsRequestSchema, CallToolRequestSchema } = require('@modelcontextprotocol/sdk/types.js');
 
 const app = express();
 app.use(express.json());
@@ -23,8 +24,8 @@ const mcpServer = new Server(
   }
 );
 
-// Register MCP tools
-mcpServer.setRequestHandler('tools/list', async () => ({
+// Register tools/list handler
+mcpServer.setRequestHandler(ListToolsRequestSchema, async () => ({
   tools: [
     {
       name: 'echo',
@@ -59,8 +60,8 @@ mcpServer.setRequestHandler('tools/list', async () => ({
   ],
 }));
 
-// Register tool call handlers
-mcpServer.setRequestHandler('tools/call', async (request) => {
+// Register tools/call handler
+mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
 
   switch (name) {
