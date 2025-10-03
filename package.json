@@ -31,6 +31,6 @@
   "devDependencies": {},
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/yourusername/render-mcp-bridge.git"
+    "url": "git+https://github.com/jgtolentino/render-mcp-bridge.git"
   }
 }
