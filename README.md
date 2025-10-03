@@ -255,95 +255,63 @@ app.post('/mcp/invoke', (req, res) => {
 
 ## Security Configuration
 
-### Production Security (Recommended)
+### ChatGPT Responses API Compatibility
 
-The server includes built-in HMAC signature verification and origin allow-list protection.
+**Important**: This server is designed for use with OpenAI's ChatGPT Responses API, which handles authentication differently than traditional MCP servers.
 
-#### 1. Configure Environment Variables in Render
+#### How Authentication Works with ChatGPT
 
-Go to Render Dashboard → Your Service → Environment:
+When you use this server with ChatGPT's Responses API, authentication is handled by OpenAI:
 
-```bash
-# Required for production
-ALLOWED_ORIGINS=https://chat.openai.com,https://chatgpt.com
-MCP_HMAC_SECRET=<random-32-bytes-hex>
-
-# Optional: Additional allowed origins
-ALLOWED_ORIGINS=https://chat.openai.com,https://chatgpt.com,https://your-app.com
+```javascript
+// In your API request to OpenAI (not to this MCP server)
+{
+  "model": "gpt-5",
+  "tools": [{
+    "type": "mcp",
+    "server_url": "https://mcp-server-njax.onrender.com/mcp",
+    "authorization": "your-oauth-token-here",  // <- OpenAI validates this
+    "require_approval": "never"
+  }]
+}
 ```
 
-**Generate HMAC Secret:**
+**Key Points:**
+- ✅ OpenAI validates the `authorization` token in their API request
+- ✅ This MCP server does NOT receive or validate custom auth headers
+- ✅ Custom HMAC/origin security is incompatible with ChatGPT Responses API
+- ✅ For production: Use Render IP allow-list or environment-based restrictions
+
+#### Production Security Options
+
+**Option 1: Render IP Allow-List (Recommended)**
+- Go to Render Dashboard → Your Service → Settings
+- Add allowed IP ranges (e.g., OpenAI's IP blocks)
+- Blocks all other traffic at infrastructure level
+
+**Option 2: Environment-Based Restrictions**
 ```bash
-# Generate secure random secret
-node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+# Set in Render Dashboard → Environment
+ALLOWED_API_KEYS=comma,separated,keys
+
+# Then check in your server:
+if (process.env.ALLOWED_API_KEYS) {
+  const apiKey = req.headers['x-api-key'];
+  if (!process.env.ALLOWED_API_KEYS.split(',').includes(apiKey)) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+}
 ```
 
-#### 2. Security Features
+#### Why Not HMAC/Origin Security?
 
-**HMAC Signature Verification:**
-- Validates `x-mcp-signature` header on all `/mcp` requests
-- Uses SHA-256 HMAC with configurable secret
-- Timing-safe comparison prevents timing attacks
-- Development mode: Auto-disabled if `MCP_HMAC_SECRET` not set
+The server previously included HMAC signature and origin verification, but these are **incompatible with ChatGPT Responses API**:
 
-**Origin Allow-List:**
-- Validates `Origin` or `Referer` header on all `/mcp` requests
-- Rejects requests from unauthorized domains
-- Default: `https://chat.openai.com,https://chatgpt.com`
-- Development mode: Auto-disabled if `ALLOWED_ORIGINS` not set
+- ❌ ChatGPT doesn't send `x-mcp-signature` headers
+- ❌ ChatGPT may not send `Origin` or `Referer` headers
+- ❌ Custom authentication breaks MCP protocol compliance
 
-#### 3. Development vs Production
-
-**Development Mode (No Secrets):**
-```bash
-# No environment variables set
-# Security checks are DISABLED
-```
-
-**Production Mode (With Secrets):**
-```bash
-# Set in Render environment
-ALLOWED_ORIGINS=https://chat.openai.com,https://chatgpt.com
-MCP_HMAC_SECRET=abc123...
-# Security checks are ENABLED
-```
-
-#### 4. Testing Security
-
-**Test HMAC Verification:**
-```bash
-# Without signature (should fail if MCP_HMAC_SECRET is set)
-curl -X POST https://mcp-server-njax.onrender.com/mcp \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","method":"tools/list","id":1}'
-# Expected: 401 Unauthorized (if MCP_HMAC_SECRET is set)
-
-# With valid signature
-SECRET="your-secret-here"
-BODY='{"jsonrpc":"2.0","method":"tools/list","id":1}'
-SIG=$(echo -n "$BODY" | openssl dgst -sha256 -hmac "$SECRET" | awk '{print $2}')
-curl -X POST https://mcp-server-njax.onrender.com/mcp \
-  -H "Content-Type: application/json" \
-  -H "x-mcp-signature: $SIG" \
-  -d "$BODY"
-# Expected: 200 OK with tools list
-```
-
-**Test Origin Verification:**
-```bash
-# Without origin (should fail if ALLOWED_ORIGINS is set)
-curl -X POST https://mcp-server-njax.onrender.com/mcp \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","method":"tools/list","id":1}'
-# Expected: 403 Forbidden (if ALLOWED_ORIGINS is set)
-
-# With valid origin
-curl -X POST https://mcp-server-njax.onrender.com/mcp \
-  -H "Content-Type: application/json" \
-  -H "Origin: https://chat.openai.com" \
-  -d '{"jsonrpc":"2.0","method":"tools/list","id":1}'
-# Expected: 200 OK (if origin is in allow-list)
-```
+**Reference**: [OpenAI MCP Documentation](https://platform.openai.com/docs/guides/tools-connectors-mcp)
 
 ## Monitoring & Debugging
 

@@ -2,7 +2,7 @@ const express = require('express');
 const crypto = require('crypto');
 const { Server } = require('@modelcontextprotocol/sdk/server/index.js');
 const { StreamableHTTPServerTransport } = require('@modelcontextprotocol/sdk/server/streamableHttp.js');
-const { ListToolsRequestSchema, CallToolRequestSchema } = require('@modelcontextprotocol/sdk/types.js');
+const { InitializeRequestSchema, ListToolsRequestSchema, CallToolRequestSchema } = require('@modelcontextprotocol/sdk/types.js');
 
 const app = express();
 
@@ -64,6 +64,18 @@ const mcpServer = new Server(
     },
   }
 );
+
+// Register initialize handler (required by MCP protocol)
+mcpServer.setRequestHandler(InitializeRequestSchema, async () => ({
+  protocolVersion: '2025-03-26',
+  capabilities: {
+    tools: {},
+  },
+  serverInfo: {
+    name: 'pulser-mcp-bridge',
+    version: '1.0.0',
+  },
+}));
 
 // Register tools/list handler
 mcpServer.setRequestHandler(ListToolsRequestSchema, async () => ({
@@ -193,34 +205,9 @@ mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
 });
 
 // Main MCP endpoint - Streamable-HTTP transport
+// Note: Custom HMAC/origin security disabled for ChatGPT Responses API compatibility
+// Authentication handled by OpenAI via 'authorization' parameter in API request
 app.post('/mcp', async (req, res) => {
-  // Security: Verify origin
-  const origin = req.headers.origin || req.headers.referer;
-  if (process.env.ALLOWED_ORIGINS && !verifyOrigin(origin)) {
-    return res.status(403).json({
-      jsonrpc: '2.0',
-      error: {
-        code: -32001,
-        message: 'Forbidden: Invalid origin',
-        data: `Origin ${origin} not in allow-list`,
-      },
-      id: req.body?.id || null,
-    });
-  }
-
-  // Security: Verify HMAC signature
-  const signature = req.headers['x-mcp-signature'];
-  if (!verifyHmac(req.rawBody || '', signature)) {
-    return res.status(401).json({
-      jsonrpc: '2.0',
-      error: {
-        code: -32002,
-        message: 'Unauthorized: Invalid HMAC signature',
-      },
-      id: req.body?.id || null,
-    });
-  }
-
   const transport = new StreamableHTTPServerTransport({
     enableJsonResponse: true,
   });
