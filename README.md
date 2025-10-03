@@ -14,12 +14,12 @@ ChatGPT → https://mcp.pulser-ai.app (Squarespace DNS)
 
 ## Features
 
-- ✅ SSE (Server-Sent Events) streaming for real-time MCP events
-- ✅ HTTP POST endpoint for MCP tool invocation
+- ✅ MCP Streamable-HTTP transport (official protocol)
+- ✅ ChatGPT Deep Research compatible (`search` + `fetch` tools)
+- ✅ OpenAI Responses API compatible (all 6 tools)
 - ✅ Health check endpoint for Render monitoring
-- ✅ CORS enabled for ChatGPT web access
-- ✅ Docker support (optional)
-- ✅ Free tier compatible
+- ✅ Initialize handler for proper MCP handshake
+- ✅ Production-ready with Render Standard plan
 
 ## Prerequisites
 
@@ -120,32 +120,77 @@ Use the button above for instant deployment.
    - Add `mcp.pulser-ai.app`
    - Render provisions free TLS certificate
 
+## Available Tools
+
+### Deep Research Tools (ChatGPT Compatible)
+
+**`search(query: string)`**
+- Search for documents or information by query
+- Returns: `{results: [{id, title, url}]}`
+- Use case: ChatGPT Deep Research, knowledge retrieval
+
+**`fetch(id: string)`**
+- Retrieve complete document content by ID
+- Returns: `{id, title, text, url, metadata}`
+- Use case: Full content retrieval for analysis and citation
+
+### General Purpose Tools (Responses API)
+
+**`echo(message: string)`**
+- Echo back the provided message
+- Returns: Text content
+
+**`get_time()`**
+- Get current server time in UTC
+- Returns: ISO timestamp with Unix time
+
+**`status()`**
+- Get server health information
+- Returns: Uptime, memory, Node version, status
+
+**`fetch_url(url: string)`**
+- Fetch content from any HTTP/HTTPS URL
+- Returns: HTTP status, content-type, response body (5KB limit)
+
 ## Verification
 
 ### 1. Health Check
 ```bash
-curl -sSf https://mcp.pulser-ai.app/healthz
+curl -sSf https://mcp-server-njax.onrender.com/healthz
 # Expected: "ok"
 ```
 
 ### 2. Service Info
 ```bash
-curl -sSf https://mcp.pulser-ai.app/
+curl -sSf https://mcp-server-njax.onrender.com/
 # Expected: JSON with service details
 ```
 
-### 3. SSE Stream
+### 3. List Tools (MCP Protocol)
 ```bash
-curl -N https://mcp.pulser-ai.app/mcp/events
-# Expected: periodic ping events
+curl -X POST https://mcp-server-njax.onrender.com/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","method":"tools/list","id":1}'
+# Expected: List of 6 tools
 ```
 
-### 4. Tool Invocation
+### 4. Test Search Tool
 ```bash
-curl -X POST https://mcp.pulser-ai.app/mcp/invoke \
+curl -X POST https://mcp-server-njax.onrender.com/mcp \
   -H "Content-Type: application/json" \
-  -d '{"tool":"echo","params":{"message":"Hello MCP"}}'
-# Expected: JSON response with result
+  -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"search","arguments":{"query":"test"}},"id":2}'
+# Expected: {"results":[...]} in content[0].text
+```
+
+### 5. Test Fetch Tool
+```bash
+curl -X POST https://mcp-server-njax.onrender.com/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"fetch","arguments":{"id":"doc-1"}},"id":3}'
+# Expected: {id, title, text, url, metadata} in content[0].text
 ```
 
 ## ChatGPT Integration

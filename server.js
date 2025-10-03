@@ -81,6 +81,34 @@ mcpServer.setRequestHandler(InitializeRequestSchema, async () => ({
 mcpServer.setRequestHandler(ListToolsRequestSchema, async () => ({
   tools: [
     {
+      name: 'search',
+      description: 'Search for documents or information by query. Returns a list of results with id, title, and url for each match. Use fetch to retrieve full content.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          query: {
+            type: 'string',
+            description: 'Search query string',
+          },
+        },
+        required: ['query'],
+      },
+    },
+    {
+      name: 'fetch',
+      description: 'Retrieve complete document content by ID for detailed analysis and citation. Returns full text, title, url, and metadata.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          id: {
+            type: 'string',
+            description: 'Document ID from search results',
+          },
+        },
+        required: ['id'],
+      },
+    },
+    {
       name: 'echo',
       description: 'Echo back the provided message',
       inputSchema: {
@@ -111,7 +139,7 @@ mcpServer.setRequestHandler(ListToolsRequestSchema, async () => ({
       },
     },
     {
-      name: 'fetch',
+      name: 'fetch_url',
       description: 'Fetch content from a URL via HTTP GET',
       inputSchema: {
         type: 'object',
@@ -132,6 +160,69 @@ mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
 
   switch (name) {
+    case 'search':
+      if (!args?.query) {
+        throw new Error('Missing required parameter: query');
+      }
+
+      // Mock search implementation - returns sample results
+      // In production, replace with actual search (vector store, database, etc.)
+      const searchResults = {
+        results: [
+          {
+            id: 'doc-1',
+            title: 'Sample Document 1',
+            url: 'https://example.com/doc1',
+          },
+          {
+            id: 'doc-2',
+            title: 'Sample Document 2',
+            url: 'https://example.com/doc2',
+          },
+          {
+            id: 'doc-3',
+            title: `Results for: ${args.query}`,
+            url: 'https://example.com/doc3',
+          },
+        ],
+      };
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(searchResults),
+          },
+        ],
+      };
+
+    case 'fetch':
+      if (!args?.id) {
+        throw new Error('Missing required parameter: id');
+      }
+
+      // Mock fetch implementation - returns sample document
+      // In production, replace with actual document retrieval
+      const document = {
+        id: args.id,
+        title: `Document ${args.id}`,
+        text: `This is the full content of document ${args.id}. In a production system, this would contain the actual document text retrieved from your data source (vector store, database, CMS, etc.). The content should be comprehensive enough for the model to answer questions and provide detailed analysis.`,
+        url: `https://example.com/documents/${args.id}`,
+        metadata: {
+          source: 'mock',
+          timestamp: new Date().toISOString(),
+        },
+      };
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(document),
+          },
+        ],
+      };
+
     case 'echo':
       if (!args?.message) {
         throw new Error('Missing required parameter: message');
@@ -173,7 +264,7 @@ mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
         ],
       };
 
-    case 'fetch':
+    case 'fetch_url':
       if (!args?.url) {
         throw new Error('Missing required parameter: url');
       }
