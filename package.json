@@ -1,0 +1,36 @@
+{
+  "name": "render-mcp-bridge",
+  "version": "0.1.0",
+  "description": "MCP (Model Context Protocol) server for ChatGPT integration hosted on Render",
+  "main": "server.js",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "dev": "NODE_ENV=development node server.js",
+    "test": "echo \"No tests yet\" && exit 0"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "chatgpt",
+    "render",
+    "bridge",
+    "sse",
+    "api"
+  ],
+  "author": "TBWA",
+  "license": "MIT",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2"
+  },
+  "devDependencies": {},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yourusername/render-mcp-bridge.git"
+  }
+}

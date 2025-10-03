@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: mcp-server
+    runtime: node
+    buildCommand: npm ci
+    startCommand: npm start
+    plan: free
+    autoDeploy: true
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        sync: false
+    # Optional: Add custom domain after deployment
+    # domains:
+    #   - mcp.pulser-ai.app
