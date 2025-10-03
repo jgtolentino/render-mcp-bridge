@@ -14,16 +14,20 @@ app.get('/healthz', (_req, res) => {
 app.get('/mcp/events', (req, res) => {
   res.set({
     'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache',
+    'Cache-Control': 'no-cache, no-transform',
     'Connection': 'keep-alive',
-    'X-Accel-Buffering': 'no'
+    'X-Accel-Buffering': 'no',
+    'Access-Control-Allow-Origin': '*'
   });
-  res.flushHeaders();
 
-  // Send periodic ping to keep connection alive
+  // Send initial connection event immediately
+  res.write(`: Connected to MCP server\n\n`);
+  res.write(`event: connected\ndata: ${JSON.stringify({ timestamp: Date.now(), status: 'ready' })}\n\n`);
+
+  // Send periodic ping to keep connection alive (reduced to 10s for Render compatibility)
   const ping = setInterval(() => {
     res.write(`event: ping\ndata: ${JSON.stringify({ timestamp: Date.now() })}\n\n`);
-  }, 15000);
+  }, 10000);
 
   req.on('close', () => {
     clearInterval(ping);
