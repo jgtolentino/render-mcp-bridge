@@ -1,10 +1,51 @@
 const express = require('express');
+const crypto = require('crypto');
 const { Server } = require('@modelcontextprotocol/sdk/server/index.js');
 const { StreamableHTTPServerTransport } = require('@modelcontextprotocol/sdk/server/streamableHttp.js');
 const { ListToolsRequestSchema, CallToolRequestSchema } = require('@modelcontextprotocol/sdk/types.js');
 
 const app = express();
-app.use(express.json());
+
+// Capture raw body for HMAC verification
+app.use(express.json({
+  verify: (req, _res, buf) => {
+    req.rawBody = buf.toString('utf8');
+  },
+}));
+
+// Security: Origin verification
+function verifyOrigin(origin) {
+  const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'https://chat.openai.com,https://chatgpt.com')
+    .split(',')
+    .map((o) => o.trim());
+
+  if (!origin) {
+    return false; // No origin header = reject
+  }
+
+  return allowedOrigins.includes(origin);
+}
+
+// Security: HMAC signature verification
+function verifyHmac(rawBody, signature) {
+  const secret = process.env.MCP_HMAC_SECRET;
+
+  if (!secret) {
+    // No secret configured = skip verification (development mode)
+    return true;
+  }
+
+  if (!signature) {
+    return false; // Secret exists but no signature provided
+  }
+
+  const expectedSignature = crypto
+    .createHmac('sha256', secret)
+    .update(rawBody)
+    .digest('hex');
+
+  return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature));
+}
 
 // Fast health check for Render (sub-100ms response)
 app.get('/healthz', (_req, res) => {
@@ -57,6 +98,20 @@ mcpServer.setRequestHandler(ListToolsRequestSchema, async () => ({
         properties: {},
       },
     },
+    {
+      name: 'fetch',
+      description: 'Fetch content from a URL via HTTP GET',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          url: {
+            type: 'string',
+            description: 'URL to fetch (must be valid HTTP/HTTPS)',
+          },
+        },
+        required: ['url'],
+      },
+    },
   ],
 }));
 
@@ -106,6 +161,32 @@ mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
         ],
       };
 
+    case 'fetch':
+      if (!args?.url) {
+        throw new Error('Missing required parameter: url');
+      }
+
+      try {
+        const url = new URL(args.url);
+        if (!['http:', 'https:'].includes(url.protocol)) {
+          throw new Error('URL must use HTTP or HTTPS protocol');
+        }
+
+        const response = await fetch(args.url);
+        const text = await response.text();
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Status: ${response.status} ${response.statusText}\nContent-Type: ${response.headers.get('content-type')}\n\n${text.slice(0, 5000)}${text.length > 5000 ? '\n... (truncated)' : ''}`,
+            },
+          ],
+        };
+      } catch (error) {
+        throw new Error(`Fetch failed: ${error.message}`);
+      }
+
     default:
       throw new Error(`Unknown tool: ${name}`);
   }
@@ -113,6 +194,33 @@ mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
 
 // Main MCP endpoint - Streamable-HTTP transport
 app.post('/mcp', async (req, res) => {
+  // Security: Verify origin
+  const origin = req.headers.origin || req.headers.referer;
+  if (process.env.ALLOWED_ORIGINS && !verifyOrigin(origin)) {
+    return res.status(403).json({
+      jsonrpc: '2.0',
+      error: {
+        code: -32001,
+        message: 'Forbidden: Invalid origin',
+        data: `Origin ${origin} not in allow-list`,
+      },
+      id: req.body?.id || null,
+    });
+  }
+
+  // Security: Verify HMAC signature
+  const signature = req.headers['x-mcp-signature'];
+  if (!verifyHmac(req.rawBody || '', signature)) {
+    return res.status(401).json({
+      jsonrpc: '2.0',
+      error: {
+        code: -32002,
+        message: 'Unauthorized: Invalid HMAC signature',
+      },
+      id: req.body?.id || null,
+    });
+  }
+
   const transport = new StreamableHTTPServerTransport({
     enableJsonResponse: true,
   });
