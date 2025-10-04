@@ -1,19 +1,30 @@
+# Render Blueprint for OCR & Extraction Services
+# Deploys two microservices for instant receipt processing
+
 services:
   - type: web
-    name: mcp-server
-    env: node
-    buildCommand: npm install
-    startCommand: npm start
-    plan: free
+    name: ocr-service
+    env: docker
+    plan: starter
+    region: oregon
+    dockerfilePath: services/ocr/Dockerfile
+    dockerContext: services/ocr
+    healthCheckPath: /health
     autoDeploy: true
-    healthCheckPath: /healthz
     envVars:
-      - key: NODE_VERSION
-        value: "20"
-      - key: NODE_ENV
-        value: production
-      - key: PORT
+      - key: OCR_LANG
+        value: en
+      - key: BASIC_AUTH_USER
         sync: false
-    # Optional: Add custom domain after deployment
-    # domains:
-    #   - mcp.pulser-ai.app
+      - key: BASIC_AUTH_PASS
+        sync: false
+
+  - type: web
+    name: extract-service
+    env: docker
+    plan: starter
+    region: oregon
+    dockerfilePath: services/extract/Dockerfile
+    dockerContext: services/extract
+    healthCheckPath: /health
+    autoDeploy: true
