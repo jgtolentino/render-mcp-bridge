@@ -93,7 +93,7 @@ class ExtractResponse(BaseModel):
 
 
 # Extraction Functions
-def extract_merchant(words: List[Word]) -> Optional[tuple[str, List[List[float]]]]:
+def extract_merchant(words: List[Word]) -> Optional[tuple]:
     """Extract merchant name (usually first 1-3 lines)"""
     if not words:
         return None
@@ -108,7 +108,7 @@ def extract_merchant(words: List[Word]) -> Optional[tuple[str, List[List[float]]
     return merchant_text, box
 
 
-def extract_date(text: str, words: List[Word]) -> Optional[tuple[str, List[List[float]]]]:
+def extract_date(text: str, words: List[Word]) -> Optional[tuple]:
     """Extract date using multiple patterns"""
     # Common date patterns
     date_patterns = [
@@ -145,7 +145,7 @@ def extract_date(text: str, words: List[Word]) -> Optional[tuple[str, List[List[
     return None
 
 
-def extract_money(text: str, words: List[Word], hint: str = "total") -> Optional[tuple[float, List[List[float]]]]:
+def extract_money(text: str, words: List[Word], hint: str = "total") -> Optional[tuple]:
     """Extract money amount with hint (total, tax, subtotal)"""
     # Money patterns
     patterns = [
