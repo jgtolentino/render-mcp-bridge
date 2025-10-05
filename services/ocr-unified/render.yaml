@@ -1,0 +1,22 @@
+# Render Blueprint for Unified OCR Service
+# Standalone deployment configuration
+
+services:
+  - type: web
+    name: ocr-unified
+    env: docker
+    plan: starter
+    region: oregon
+    rootDir: .
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    autoDeploy: false
+    envVars:
+      - key: OCR_LANG
+        value: en
+      - key: PORT
+        value: 8080
+      - key: BASIC_AUTH_USER
+        sync: false
+      - key: BASIC_AUTH_PASS
+        sync: false

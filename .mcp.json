@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "ocr-unified": {
+      "url": "https://mcp-server-njax.onrender.com",
+      "capabilities": ["ocr", "extract", "instant"],
+      "auth": {
+        "type": "basic",
+        "envVars": ["BASIC_AUTH_USER", "BASIC_AUTH_PASS"]
+      }
+    }
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "project": {
+    "name": "Render MCP Bridge",
+    "description": "MCP server for ChatGPT integration + Unified OCR service",
+    "type": "microservices"
+  },
+  "services": {
+    "mcp-bridge": {
+      "runtime": "node",
+      "framework": "express",
+      "port": 3000
+    },
+    "ocr-unified": {
+      "runtime": "python",
+      "framework": "fastapi",
+      "port": 8080
+    }
+  },
+  "deployment": {
+    "platform": "render",
+    "region": "oregon",
+    "plan": "starter"
+  }
+}
