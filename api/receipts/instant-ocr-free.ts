@@ -22,6 +22,7 @@ async function ocrWithOCRSpace(imageUrl: string) {
   formData.append('language', 'eng');
   formData.append('isOverlayRequired', 'true');
   formData.append('OCREngine', '2');
+  formData.append('filetype', 'JPG'); // Specify file type explicitly
 
   const response = await fetch('https://api.ocr.space/parse/image', {
     method: 'POST',
