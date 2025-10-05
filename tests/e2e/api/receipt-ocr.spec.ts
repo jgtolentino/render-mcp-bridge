@@ -1,35 +1,23 @@
 /**
- * E2E Tests for Instant Receipt OCR Pipeline
+ * Receipt OCR API Tests
+ * Validates instant OCR processing and field extraction
  */
 import { test, expect, request } from '@playwright/test';
 
 const API_BASE = process.env.API_BASE_URL || 'http://localhost:3000';
-const OCR_BASE = process.env.OCR_BASE_URL;
-const EXTRACT_BASE = process.env.EXTRACT_BASE_URL;
+const OCR_UNIFIED = process.env.OCR_UNIFIED_URL || 'http://localhost:8080';
 
 test.describe('@api Receipt OCR Pipeline', () => {
-  test('OCR service health check', async () => {
-    test.skip(!OCR_BASE, 'OCR_BASE_URL not set');
-
-    const ctx = await request.newContext({ baseURL: OCR_BASE });
-    const res = await ctx.get('/health');
+  test('Unified OCR service health check', async () => {
+    const ctx = await request.newContext();
+    const res = await ctx.get(`${OCR_UNIFIED}/health`);
 
     expect(res.ok()).toBeTruthy();
     const data = await res.json();
     expect(data.ok).toBe(true);
-    expect(data.service).toBe('ocr');
-  });
-
-  test('Extract service health check', async () => {
-    test.skip(!EXTRACT_BASE, 'EXTRACT_BASE_URL not set');
-
-    const ctx = await request.newContext({ baseURL: EXTRACT_BASE });
-    const res = await ctx.get('/health');
-
-    expect(res.ok()).toBeTruthy();
-    const data = await res.json();
-    expect(data.ok).toBe(true);
-    expect(data.service).toBe('extract');
+    expect(data.service).toBe('ocr-unified');
+    expect(data).toHaveProperty('lang');
+    expect(data).toHaveProperty('auth_enabled');
   });
 
   test('Instant OCR API endpoint exists', async () => {
@@ -44,40 +32,83 @@ test.describe('@api Receipt OCR Pipeline', () => {
     expect(data.error).toContain('file');
   });
 
-  test.skip('Complete OCR pipeline with sample receipt', async () => {
-    // This test requires a sample receipt image
-    // Skip by default, run manually with: npx playwright test --grep="Complete OCR"
+  test('OCR processing completes within SLA', async () => {
+    const ctx = await request.newContext();
 
-    const ctx = await request.newContext({ baseURL: API_BASE });
+    // Create minimal test image (1x1 white pixel PNG)
+    const testImage = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==',
+      'base64'
+    );
 
-    // TODO: Add sample receipt image to tests/fixtures/
-    // const file = fs.readFileSync('tests/fixtures/sample-receipt.jpg');
+    const startTime = Date.now();
 
-    const res = await ctx.post('/api/receipts/instant-ocr', {
+    const res = await ctx.post(`${OCR_UNIFIED}/process`, {
       multipart: {
         file: {
-          name: 'receipt.jpg',
-          mimeType: 'image/jpeg',
-          buffer: Buffer.from('') // Replace with actual image buffer
-        }
-      }
+          name: 'test.png',
+          mimeType: 'image/png',
+          buffer: testImage,
+        },
+      },
+    });
+
+    const endTime = Date.now();
+    const duration = endTime - startTime;
+
+    expect(res.ok()).toBeTruthy();
+    expect(duration).toBeLessThan(5000); // Should complete in <5 seconds
+  });
+
+  test('Process endpoint returns valid response structure', async () => {
+    const ctx = await request.newContext();
+
+    const testImage = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==',
+      'base64'
+    );
+
+    const res = await ctx.post(`${OCR_UNIFIED}/process`, {
+      multipart: {
+        file: {
+          name: 'test.png',
+          mimeType: 'image/png',
+          buffer: testImage,
+        },
+        doc_id: 'test-123',
+      },
     });
 
     expect(res.ok()).toBeTruthy();
-    const data = await res.json();
+    const json = await res.json();
 
-    expect(data.ok).toBe(true);
-    expect(data.storage_path).toBeTruthy();
-    expect(data.extracted).toBeTruthy();
-    expect(data.extracted.confidence).toBeGreaterThanOrEqual(0);
-    expect(data.extracted.confidence).toBeLessThanOrEqual(100);
+    // Validate response structure
+    expect(json).toHaveProperty('merchant');
+    expect(json).toHaveProperty('date');
+    expect(json).toHaveProperty('total');
+    expect(json).toHaveProperty('currency');
+    expect(json).toHaveProperty('confidence');
+    expect(json).toHaveProperty('status');
+    expect(json).toHaveProperty('ocr_text');
+    expect(json).toHaveProperty('grounding');
   });
-});
 
-test.describe('@integration Receipt OCR Database', () => {
-  test('receipt_ocr table exists', async () => {
-    // This would require direct database access
-    // For now, just verify through API that table is accessible
-    test.skip(true, 'Requires database credentials');
+  test('Invalid file type returns 400', async () => {
+    const ctx = await request.newContext();
+    const textFile = Buffer.from('This is not an image');
+
+    const res = await ctx.post(`${OCR_UNIFIED}/process`, {
+      multipart: {
+        file: {
+          name: 'test.txt',
+          mimeType: 'text/plain',
+          buffer: textFile,
+        },
+      },
+    });
+
+    expect(res.status()).toBe(400);
+    const json = await res.json();
+    expect(json.detail).toContain('Invalid image');
   });
 });
