@@ -1,41 +1,14 @@
-# Render Blueprint for MCP Bridge + OCR Service
-# Two microservices: MCP server (Node.js) and OCR service (Python/Docker)
+# Render Blueprint for Unified OCR Service
+# Single microservice: OCR + Extraction in one container ($7/month)
 
 services:
   - type: web
-    name: mcp-server
-    env: node
-    plan: starter
-    region: oregon
-    buildCommand: npm ci
-    startCommand: node server.js
-    autoDeploy: true
-    healthCheckPath: /healthz
-    envVars:
-      - key: NODE_VERSION
-        value: "20"
-      - key: PORT
-        value: "10000"
-      - key: OCR_BASE_URL
-        sync: false
-      - key: EXTRACT_BASE_URL
-        sync: false
-      - key: BASIC_AUTH_USER
-        sync: false
-      - key: BASIC_AUTH_PASS
-        sync: false
-      - key: DOWNSTREAM_BASIC_AUTH_USER
-        sync: false
-      - key: DOWNSTREAM_BASIC_AUTH_PASS
-        sync: false
-
-  - type: web
-    name: ocr-service
+    name: ocr-unified
     env: docker
     plan: starter
     region: oregon
-    dockerfilePath: services/ocr/Dockerfile
-    dockerContext: services/ocr
+    dockerfilePath: services/ocr-unified/Dockerfile
+    dockerContext: services/ocr-unified
     autoDeploy: true
     healthCheckPath: /health
     envVars:
