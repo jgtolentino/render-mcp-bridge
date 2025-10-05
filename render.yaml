@@ -7,16 +7,16 @@ services:
     env: docker
     plan: starter
     region: oregon
+    rootDir: services/ocr-unified
     dockerfilePath: services/ocr-unified/Dockerfile
-    dockerContext: services/ocr-unified
     autoDeploy: true
     healthCheckPath: /health
     envVars:
       - key: PORT
-        value: "10000"
-      - key: OCR_LANG
-        value: en
+        value: 10000
       - key: BASIC_AUTH_USER
         sync: false
       - key: BASIC_AUTH_PASS
         sync: false
+      - key: OCR_LANG
+        value: en
