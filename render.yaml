@@ -1,14 +1,14 @@
-# Render Blueprint for OCR & Extraction Services
-# Deploys two microservices for instant receipt processing
+# Render Blueprint for Unified OCR Service
+# Single microservice for instant receipt processing (OCR + extraction)
 
 services:
   - type: web
-    name: ocr-service
+    name: ocr-unified
     env: docker
     plan: starter
     region: oregon
-    dockerfilePath: services/ocr/Dockerfile
-    dockerContext: services/ocr
+    dockerfilePath: services/ocr-unified/Dockerfile
+    dockerContext: services/ocr-unified
     healthCheckPath: /health
     autoDeploy: true
     envVars:
@@ -18,13 +18,3 @@ services:
         sync: false
       - key: BASIC_AUTH_PASS
         sync: false
-
-  - type: web
-    name: extract-service
-    env: docker
-    plan: starter
-    region: oregon
-    dockerfilePath: services/extract/Dockerfile
-    dockerContext: services/extract
-    healthCheckPath: /health
-    autoDeploy: true

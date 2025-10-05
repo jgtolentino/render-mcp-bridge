@@ -4,8 +4,7 @@
  */
 import { createClient } from '@supabase/supabase-js';
 
-const OCR_BASE_URL = process.env.OCR_BASE_URL || 'http://localhost:8080';
-const EXTRACT_BASE_URL = process.env.EXTRACT_BASE_URL || 'http://localhost:8081';
+const OCR_UNIFIED_URL = process.env.OCR_UNIFIED_URL || 'http://localhost:8080';
 
 export async function POST(req: Request) {
   const supabase = createClient(
@@ -52,57 +51,41 @@ export async function POST(req: Request) {
       );
     }
 
-    // Step 3: Call OCR service
+    // Step 3: Call unified OCR service (OCR + extraction in one call)
     const imageBlob = await fetch(signedData.signedUrl).then(r => r.blob());
     const ocrFormData = new FormData();
     ocrFormData.append('file', imageBlob, 'receipt.jpg');
     ocrFormData.append('doc_id', receiptId || storagePath);
 
-    const ocrResponse = await fetch(`${OCR_BASE_URL}/ocr`, {
+    const ocrResponse = await fetch(`${OCR_UNIFIED_URL}/process`, {
       method: 'POST',
       body: ocrFormData
     });
 
     if (!ocrResponse.ok) {
       return new Response(
-        JSON.stringify({ ok: false, error: `OCR failed: ${ocrResponse.statusText}` }),
+        JSON.stringify({ ok: false, error: `OCR processing failed: ${ocrResponse.statusText}` }),
         { status: 500, headers: { 'content-type': 'application/json' } }
       );
     }
 
-    const ocrResult = await ocrResponse.json();
+    const result = await ocrResponse.json();
 
-    // Step 4: Extract structured fields
-    const extractResponse = await fetch(`${EXTRACT_BASE_URL}/extract`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ ocr: ocrResult })
-    });
-
-    if (!extractResponse.ok) {
-      return new Response(
-        JSON.stringify({ ok: false, error: `Extraction failed: ${extractResponse.statusText}` }),
-        { status: 500, headers: { 'content-type': 'application/json' } }
-      );
-    }
-
-    const extractResult = await extractResponse.json();
-
-    // Step 5: Save to database
+    // Step 4: Save to database
     const { data: savedData, error: saveError } = await supabase
       .from('te.receipt_ocr')
       .upsert({
         receipt_id: receiptId || null,
         storage_path: storagePath,
-        ocr_text: ocrResult.text,
-        merchant: extractResult.merchant,
-        date: extractResult.date,
-        total: extractResult.total,
-        tax: extractResult.tax,
-        currency: extractResult.currency,
-        confidence: extractResult.confidence,
-        grounding: extractResult.grounding,
-        status: extractResult.status,
+        ocr_text: result.ocr_text,
+        merchant: result.merchant,
+        date: result.date,
+        total: result.total,
+        tax: result.tax,
+        currency: result.currency,
+        confidence: result.confidence,
+        grounding: result.grounding,
+        status: result.status,
         processed_at: new Date().toISOString()
       })
       .select()
@@ -118,19 +101,19 @@ export async function POST(req: Request) {
         ok: true,
         storage_path: storagePath,
         ocr: {
-          text: ocrResult.text,
-          confidence: ocrResult.confidence
+          text: result.ocr_text,
+          confidence: result.ocr_confidence
         },
         extracted: {
-          merchant: extractResult.merchant,
-          date: extractResult.date,
-          total: extractResult.total,
-          tax: extractResult.tax,
-          currency: extractResult.currency,
-          status: extractResult.status,
-          confidence: extractResult.confidence
+          merchant: result.merchant,
+          date: result.date,
+          total: result.total,
+          tax: result.tax,
+          currency: result.currency,
+          status: result.status,
+          confidence: result.confidence
         },
-        grounding: extractResult.grounding
+        grounding: result.grounding
       }),
       {
         status: 200,
