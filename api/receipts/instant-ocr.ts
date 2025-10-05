@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { sv } from '../_supabase';
+import { cors } from '../_cors';
 
 const OCR_BASE_URL = process.env.OCR_BASE_URL!;
 const EXTRACT_BASE_URL = process.env.EXTRACT_BASE_URL || OCR_BASE_URL;
@@ -24,6 +25,12 @@ async function signedUrlFromStoragePath(path: string): Promise<string | null> {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  cors(res);
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
   try {
     if (req.method !== 'POST') {
       return res.status(405).json({ ok: false, error: 'method_not_allowed' });
