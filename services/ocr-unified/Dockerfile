@@ -6,12 +6,12 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# System libs Paddle needs
+# System libs for Paddle on CPU
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libgomp1 libglib2.0-0 libgl1 ca-certificates curl \
   && rm -rf /var/lib/apt/lists/*
 
-# Use CPU wheel for Paddle; Baidu mirror hosts official wheels
+# CPU wheel for Paddle (do NOT install *-gpu)
 RUN python -m pip install --upgrade pip
 RUN python -m pip install "paddlepaddle==2.5.1" -i https://mirror.baidu.com/pypi/simple
 
@@ -20,6 +20,8 @@ RUN python -m pip install -r /app/requirements.txt
 
 COPY app.py /app/app.py
 
+# Render provides $PORT; default to 10000 for local
 ENV PORT=10000 OCR_LANG=en
+
 EXPOSE 10000
-CMD ["python", "-m", "uvicorn", "app:app", "--host", "0.0.0.0", "--port", "10000", "--workers", "1"]
+CMD ["sh", "-c", "uvicorn app:app --host 0.0.0.0 --port ${PORT:-10000} --workers 1"]
