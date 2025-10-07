@@ -1,6 +1,7 @@
 const express = require('express');
 const helmet = require('helmet');
 const crypto = require('crypto');
+const path = require('path');
 const { Server } = require('@modelcontextprotocol/sdk/server/index.js');
 const { StreamableHTTPServerTransport } = require('@modelcontextprotocol/sdk/server/streamableHttp.js');
 const { InitializeRequestSchema, ListToolsRequestSchema, CallToolRequestSchema } = require('@modelcontextprotocol/sdk/types.js');
@@ -25,6 +26,9 @@ app.use(express.json({
     req.rawBody = buf.toString('utf8');
   },
 }));
+
+// Serve static files from public directory
+app.use('/public', express.static(path.join(__dirname, 'public')));
 
 // Request timeouts
 app.use((req, res, next) => {
