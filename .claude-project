@@ -1,0 +1,5 @@
+{
+  "name": "render-mcp-bridge",
+  "root": "/Users/tbwa/Documents/GitHub/render-mcp-bridge",
+  "description": "MCP bridge server for Render.com deployment"
+}
