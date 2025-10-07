@@ -1,5 +1,61 @@
 services:
   - type: web
+    name: render-mcp-bridge
+    env: node
+    plan: starter
+    region: oregon
+    buildCommand: npm ci
+    startCommand: npm start
+    autoDeploy: true
+    healthCheckPath: /healthz
+    envVars:
+      # Node Configuration
+      - key: NODE_VERSION
+        value: "20"
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "3000"
+
+      # OAuth2/OIDC Configuration (required in production)
+      # Example for Auth0:
+      #   AUTH_DOMAIN: your-tenant.auth0.com
+      #   AUTH_AUDIENCE: mcp-api
+      #   AUTH_ISSUER: https://your-tenant.auth0.com/
+      #   JWKS_URI: https://your-tenant.auth0.com/.well-known/jwks.json
+      # Example for Supabase:
+      #   AUTH_DOMAIN: your-project.supabase.co
+      #   AUTH_AUDIENCE: authenticated
+      #   AUTH_ISSUER: https://your-project.supabase.co/auth/v1
+      #   JWKS_URI: https://your-project.supabase.co/auth/v1/jwks
+      - key: AUTH_DOMAIN
+        sync: false
+      - key: AUTH_AUDIENCE
+        value: mcp-api
+      - key: AUTH_ISSUER
+        sync: false
+      - key: JWKS_URI
+        sync: false
+
+      # Migration Support (Basic Auth fallback - MUST BE FALSE IN PRODUCTION)
+      # Setting this to true in production will cause the server to exit immediately
+      - key: ENABLE_BASIC_AUTH_FALLBACK
+        value: "false"
+      - key: BASIC_AUTH_USER
+        sync: false
+      - key: BASIC_AUTH_PASS
+        sync: false
+
+      # CORS Configuration
+      - key: ALLOWED_ORIGINS
+        value: "https://chat.openai.com,https://chatgpt.com"
+
+      # Optional: HMAC request signature verification
+      # Set this to enable request signature verification for additional security
+      # - key: MCP_HMAC_SECRET
+      #   sync: false
+
+  - type: web
     name: ocr-unified
     env: docker
     plan: starter

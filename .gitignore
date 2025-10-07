@@ -35,3 +35,4 @@ build/
 *.pid.lock
 .vercel
 .gcloud/
+.claude-archive/

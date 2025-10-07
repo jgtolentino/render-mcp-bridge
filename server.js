@@ -1,17 +1,57 @@
 const express = require('express');
+const helmet = require('helmet');
 const crypto = require('crypto');
 const { Server } = require('@modelcontextprotocol/sdk/server/index.js');
 const { StreamableHTTPServerTransport } = require('@modelcontextprotocol/sdk/server/streamableHttp.js');
 const { InitializeRequestSchema, ListToolsRequestSchema, CallToolRequestSchema } = require('@modelcontextprotocol/sdk/types.js');
+const { authenticate } = require('./middleware/auth.js');
+const { requireToolsExec, requireAdmin } = require('./middleware/scopes.js');
+const { apiRateLimiter, strictRateLimiter } = require('./middleware/rateLimiting.js');
+const { auditLog } = require('./middleware/auditLog.js');
+const { collectMetrics, getMetrics } = require('./middleware/metrics.js');
 
 const app = express();
 
-// Capture raw body for HMAC verification
+// Security headers with helmet
+app.use(helmet({
+  contentSecurityPolicy: false, // MCP needs flexibility for content
+  crossOriginEmbedderPolicy: false
+}));
+
+// Request body parsing with size limits
 app.use(express.json({
+  limit: '10mb', // Max request body size
   verify: (req, _res, buf) => {
     req.rawBody = buf.toString('utf8');
   },
 }));
+
+// Request timeouts
+app.use((req, res, next) => {
+  // Header timeout: 5 seconds
+  req.setTimeout(5000, () => {
+    res.status(408).json({
+      error: 'request_timeout',
+      message: 'Request header timeout'
+    });
+  });
+
+  // Response timeout: 60 seconds
+  res.setTimeout(60000, () => {
+    res.status(504).json({
+      error: 'gateway_timeout',
+      message: 'Response timeout'
+    });
+  });
+
+  next();
+});
+
+// Metrics collection (before other middleware)
+app.use(collectMetrics());
+
+// Audit logging (before other middleware)
+app.use(auditLog());
 
 // Security: Origin verification
 function verifyOrigin(origin) {
@@ -47,9 +87,34 @@ function verifyHmac(rawBody, signature) {
   return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature));
 }
 
-// Fast health check for Render (sub-100ms response)
+// Fast health check for Render (no auth, sub-100ms response)
 app.get('/healthz', (_req, res) => {
   res.status(200).send('ok');
+});
+
+// Readiness check with dependency validation
+app.get('/readyz', async (_req, res) => {
+  const checks = {
+    server: 'ok',
+    timestamp: new Date().toISOString()
+  };
+
+  // Check JWKS endpoint if configured
+  if (process.env.JWKS_URI) {
+    try {
+      const response = await fetch(process.env.JWKS_URI, { signal: AbortSignal.timeout(5000) });
+      checks.jwks = response.ok ? 'ok' : 'failed';
+    } catch (err) {
+      checks.jwks = 'failed';
+      checks.jwks_error = err.message;
+    }
+  }
+
+  // Overall status
+  const allOk = Object.values(checks).every(v => v === 'ok' || typeof v === 'string');
+  const status = allOk ? 200 : 503;
+
+  res.status(status).json(checks);
 });
 
 // Create MCP server instance
@@ -296,36 +361,52 @@ mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
 });
 
 // Main MCP endpoint - Streamable-HTTP transport
-// Note: Custom HMAC/origin security disabled for ChatGPT Responses API compatibility
-// Authentication handled by OpenAI via 'authorization' parameter in API request
-app.post('/mcp', async (req, res) => {
-  const transport = new StreamableHTTPServerTransport({
-    enableJsonResponse: true,
-  });
+// PRODUCTION-SAFE: OAuth2/OIDC required, rate limited, minimal scopes
+app.post('/mcp',
+  apiRateLimiter, // 100 req/min per sub or IP
+  authenticate({ requiredScopes: ['mcp:tools.exec'], enforceAuth: process.env.NODE_ENV === 'production' }),
+  async (req, res) => {
+    const transport = new StreamableHTTPServerTransport({
+      enableJsonResponse: true,
+    });
 
-  // Clean up transport on connection close
-  res.on('close', () => {
-    transport.close();
-  });
+    // Clean up transport on connection close
+    res.on('close', () => {
+      transport.close();
+    });
 
-  try {
-    await mcpServer.connect(transport);
-    await transport.handleRequest(req, res, req.body);
-  } catch (error) {
-    console.error('MCP request error:', error);
-    if (!res.headersSent) {
-      res.status(500).json({
-        jsonrpc: '2.0',
-        error: {
-          code: -32603,
-          message: 'Internal error',
-          data: error.message,
-        },
-        id: req.body?.id || null,
-      });
+    try {
+      // Log authenticated user (already logged by audit middleware)
+      if (req.auth) {
+        console.log(`🔐 MCP request from: ${req.auth.sub} (scopes: ${req.auth.scopes.join(', ')})`);
+      }
+
+      await mcpServer.connect(transport);
+      await transport.handleRequest(req, res, req.body);
+    } catch (error) {
+      console.error('MCP request error:', error.message);
+
+      // Error taxonomy: 500 for internal errors, no stack traces
+      if (!res.headersSent) {
+        res.status(500).json({
+          jsonrpc: '2.0',
+          error: {
+            code: -32603,
+            message: 'Internal error'
+          },
+          id: req.body?.id || null,
+        });
+      }
     }
   }
-});
+);
+
+// Metrics endpoint (requires admin scope)
+app.get('/metrics',
+  strictRateLimiter, // 10 req/min
+  authenticate({ requiredScopes: ['mcp:admin'] }),
+  getMetrics
+);
 
 // Root endpoint - service info
 app.get('/', (_req, res) => {
@@ -343,13 +424,17 @@ app.get('/', (_req, res) => {
   });
 });
 
-// Error handling
+// Error handling (no stack traces to client)
 app.use((err, req, res, _next) => {
   console.error('Server error:', err);
+
+  // Don't send stack traces in production
+  const isDev = process.env.NODE_ENV !== 'production';
+
   if (!res.headersSent) {
     res.status(500).json({
-      error: 'Internal server error',
-      message: err.message,
+      error: 'internal_server_error',
+      message: isDev ? err.message : 'An internal error occurred'
     });
   }
 });

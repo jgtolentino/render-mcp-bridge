@@ -1,5 +1,17 @@
 {
   "name": "render-mcp-bridge",
   "root": "/Users/tbwa/Documents/GitHub/render-mcp-bridge",
-  "description": "MCP bridge server for Render.com deployment"
+  "description": "MCP bridge server for Render.com deployment",
+  "stack": ["Node.js", "Express", "PostgreSQL", "Supabase"],
+  "commands": {
+    "dev": "npm start",
+    "build": "npm run build",
+    "test": "npm run test:auth",
+    "deploy": "git push origin main"
+  },
+  "docs": {
+    "auth": "docs/AUTH.md",
+    "migration": "docs/MIGRATION.md",
+    "production": "docs/PRODUCTION_HARDENING_COMPLETE.md"
+  }
 }
